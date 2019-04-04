@@ -14,13 +14,17 @@ class Player(Model):
     side = SmallIntegerField()
 
     class Meta:
-        database = db  # модель будет использовать базу данных 'people.db'
+        database = db  
+
 
 
 
 
 client = discord.Client()
-mess = ''
+night = False
+players = {}
+bomber = []
+hilling = ''
 
 
 def get_token():
@@ -45,23 +49,25 @@ async def on_message(message):
         else:
             com = msg[msg.index('!') + 1: ]
     else: return None
-    channel = message.author
-    reqest = 'error'
+    reqest = []
     if com in commands:
             try:
-                channel,reqest = commands[com](message,msg)
+                reqest = commands[com](message,msg)
             except Exception as e:
                 print(e)
-                reqest = e     
-    await client.send_message(channel, reqest)
+                reqest = [(message.author, e)] 
+    for chan, req in reqest:
+        await client.send_message(chan, req)
+    reqest = []
+    
 
 def test(message,content):
-    return message.author,'test'
+    return [(message.author,'test')]
 
 def start_game(message, size):
     create_table(size)
 
-    return message.channel, 'Попросите свои роли с помощью комманды s!role'
+    return [(message.channel, 'Попросите свои роли с помощью комманды s!role')]
 
 def create_table(size):
     size = int(size)
@@ -89,27 +95,75 @@ def create_table(size):
     #print(Player.select().count())
 
 def add_player(message,trash):
+    global players
+    
     name = str(message.author)
     name = name[:name.index('#')]
+    players[name] = message.author
     empty_player = Player.select().where(Player.name == 'name').get()
     empty_player.name = name
     empty_player.obj = message.author
     empty_player.save()
-    return 1
+    return [(message.author, empty_player.role)]
+
+def night(message,trash):
+    global night 
+    global players
+    night = True
+    result = []
+    size = Player.select().count()
+    #mafia = Player.select().where(Player.side == 1).get()
+    for p in Player.select().where(Player.side == 1):
+        result.append((players[p.name],'выстрелите в жертву командой s!kill'))
+    for p in Player.select().where(Player.role == 'дон мафии'):
+        result.append((players[p.name],'проверьте горожанина командой s!check'))
+    for p in Player.select().where(Player.role == 'шеф полиции'):
+        result.append((players[p.name],'проверьте горожанина командой s!check'))
+    for p in Player.select().where(Player.role == 'доктор'):
+        result.append((players[p.name],'вылечите горожанина командой s!hill'))
+    return result
+
+def check(message,trash):
+    player = Player.select().where(Player.role == message.author)
+    if (player.role == 'дон мафии'):
+        victim = Player.select().where(Player.name == message.content)
+        if victim.role == 'шеф полиции':
+            return [(message.author, 'да, он шеф полиции')]
+    elif (player.role == 'шеф полиции'):
+        victim = Player.select().where(Player.name == message.content)
+        if victim.role == 'дон мафии':
+            return [(message.author, 'да, он дон мафии')]
+    
+    else:
+        text = 'очень смешно, твоя роль ' + player.role +' не позволяет проверять людей'
+        return [(message.author, text)]
+
+def kill(message,trash):
+    global bomber
+    bomber.append(message.content)
+    return [(message.author, 'бам!')]
+
+def hill(message,trash):
+    global hill
+    hill = message.content
+    return [(message.author, 'вылечим '+ message.content)]
+
+def day(message,trash):
+    global bomber
+    global hill
+    
+
 
 commands  = {
     'test': test,
     'mafia': start_game,
-    'role':add_player
-
+    'role': add_player,
+    'night': night,
+    'check':check,
+    'kill': kill,
+    'hill':hill,
+    'day': day
     }
-
-def is_channel(message):
-    if not(str(message.channel) in channel):
-        channel.append(str(message.channel))
-        channels[str(message.channel)] = message.channel
-
-
 
 DISCORD_BOT_TOKEN = get_token()
 
