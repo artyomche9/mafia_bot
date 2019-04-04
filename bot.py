@@ -2,6 +2,7 @@ import discord
 import asyncio
 from random import shuffle
 from peewee import *
+import time
 
 
 db = SqliteDatabase('people.db')
@@ -60,7 +61,7 @@ def test(message,content):
 def start_game(message, size):
     create_table(size)
 
-    return message.channel, 'done'
+    return message.channel, 'Попросите свои роли с помощью комманды s!role'
 
 def create_table(size):
     size = int(size)
@@ -72,21 +73,35 @@ def create_table(size):
         roles.append(['доктор',0])
     for i in range(int(size/3)):
         roles.append(['мафия',1])
-    for i in range(int(size - size/3)):
+    for i in range(size - int(size/3)):
         roles.append(['мирный',0])
     shuffle(roles)
+    try:
+        Player.drop_table()
+    except Exception as e:
+        print (e)
     Player.create_table()
     for role in roles:
         Player.create(name = 'name', obj = 'obj', role = role[0], side = role[1])
 
     '''grandma = Person.create(name= 'Grandma',role = 'mafia')
     grandma = Person.select().where(Person.name == 'Grandma L.').get()'''
-    #print(grandma)
-    
+    #print(Player.select().count())
+
+def add_player(message,trash):
+    name = str(message.author)
+    name = name[:name.index('#')]
+    empty_player = Player.select().where(Player.name == 'name').get()
+    empty_player.name = name
+    empty_player.obj = message.author
+    empty_player.save()
+    return 1
 
 commands  = {
     'test': test,
-    'mafia': start_game
+    'mafia': start_game,
+    'role':add_player
+
     }
 
 def is_channel(message):
